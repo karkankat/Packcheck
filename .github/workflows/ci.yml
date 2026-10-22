@@ -1,0 +1,57 @@
+name: PackCheck CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -v
+
+  package:
+    name: Upload project artifact
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Upload project files
+        uses: actions/upload-artifact@v7
+        with:
+          name: packcheck-project
+          path: |
+            app_final.py
+            test_app.py
+            requirements.txt
+            requirements-dev.txt
+            README.md
+            .env.example
+            .gitignore
+            .github/workflows/ci.yml
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
