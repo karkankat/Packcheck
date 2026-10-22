@@ -1,15 +1,47 @@
-
 """PackCheck — сервис проверки снаряжения для велопохода.
 
 Учебная основа: app_final.py из материалов курса.
 """
 
+import logging
+import math
+import os
+
 from fastapi import FastAPI, Query
 
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger("packcheck")
+
+try:
+    DEFAULT_WEIGHT_LIMIT_KG = float(os.getenv("DEFAULT_WEIGHT_LIMIT_KG", "10"))
+except ValueError:
+    raise ValueError(
+        "DEFAULT_WEIGHT_LIMIT_KG должна содержать число, например 10 или 8.5"
+    ) from None
+
+if (
+    not math.isfinite(DEFAULT_WEIGHT_LIMIT_KG)
+    or DEFAULT_WEIGHT_LIMIT_KG <= 0
+    or DEFAULT_WEIGHT_LIMIT_KG != round(DEFAULT_WEIGHT_LIMIT_KG, 3)
+):
+    raise ValueError(
+        "DEFAULT_WEIGHT_LIMIT_KG должна быть положительным числом "
+        "с точностью до 0.001 кг"
+    )
 
 app = FastAPI(title="PackCheck", version=APP_VERSION)
+
+logger.info(
+    "Настройки PackCheck: version=%s default_limit_kg=%s",
+    APP_VERSION,
+    DEFAULT_WEIGHT_LIMIT_KG,
+)
 
 GEAR = [
     {"id": 1, "name": "Палатка", "category": "sleep", "weight_g": 1500},
@@ -73,7 +105,7 @@ def summary():
 @app.get("/check")
 def check(
     limit_kg: float = Query(
-        default=10.0,
+        default=DEFAULT_WEIGHT_LIMIT_KG,
         gt=0,
         multiple_of=0.001,
         allow_inf_nan=False,
@@ -81,10 +113,17 @@ def check(
     ),
 ):
     total_weight_kg = get_total_weight_g() / 1000
+    fits = total_weight_kg <= limit_kg
+    logger.info(
+        "Проверка веса: total_kg=%.3f limit_kg=%.3f fits=%s",
+        total_weight_kg,
+        limit_kg,
+        fits,
+    )
     return {
         "total_weight_kg": total_weight_kg,
         "limit_kg": limit_kg,
-        "fits": total_weight_kg <= limit_kg,
+        "fits": fits,
         "remaining_kg": round(max(0.0, limit_kg - total_weight_kg), 3),
         "overweight_kg": round(max(0.0, total_weight_kg - limit_kg), 3),
     }
